@@ -61,7 +61,7 @@ main.prototype.refreshData = function(callback) {
 	var l;
 	var scope = this;
 	// get the races data
-	scope.mysql.query("select * from races", function(err, rows, fields) {
+	/*scope.mysql.query("select * from races", function(err, rows, fields) {
 		if (rows.length > 0 && rows[0].id > 0) {
 			var l = rows.length;
 			// save the races data
@@ -80,6 +80,31 @@ main.prototype.refreshData = function(callback) {
 				}
 			});
 		}
+	});*/
+	this.mongo.open("clients", function(collection) {
+		collection.find({
+			
+		}, {
+			limit:1
+		}).toArray(function(err, docs) {
+			var clients 		= docs[0].data.clients;
+			var races			= {};
+			
+			var i;
+			var j;
+			for (i=0;i<clients.length;i++) {
+				//console.log("clients[i]",clients[i].races.length);
+				for (j=0;j<clients[i].races.length;j++) {
+					races[clients[i].races[j].uuid] = clients[i].races[j];
+					races[clients[i].races[j].uuid].client = clients[i];
+				}
+			}
+			for (i in races) {
+				delete races[i].client.races;
+			}
+			scope.raceData = races;
+			callback();
+		});
 	});
 };
 main.prototype.updateCount = function(callback) {
@@ -128,7 +153,7 @@ main.prototype.updateCount = function(callback) {
   			var results = dbres.documents[0].results[0].value;
 			scope.online = results;
   		}
-  		console.log("ONLINE:: ",JSON.stringify(scope.online));
+  		//console.log("ONLINE:: ",JSON.stringify(scope.online));
 		callback();
   })
 	
@@ -186,7 +211,7 @@ main.prototype.parseRequest = function(data, server) {
 main.prototype.execute = function(data, server) {
 	var scope = this;
 	
-	scope.log("METHOD: ",data.method);
+	scope.log("execute: ", data);
 	
 	switch (data.method) {
 		default:
@@ -218,7 +243,7 @@ main.prototype.execute = function(data, server) {
 							$addToSet: {
 								racedata: {
 									data:	{score:0},
-									race:	data.params.race*1,
+									race:	data.params.race,
 									level:	0,
 									type:	"data"
 								}
@@ -275,7 +300,7 @@ main.prototype.execute = function(data, server) {
 								$addToSet: {
 									racedata: {
 										data:	levelData,
-										race:	data.params.race*1,
+										race:	data.params.race,
 										level:	levelIndex,
 										type:	"data"
 									}
@@ -351,7 +376,7 @@ main.prototype.requireParameters = function(data, server, params) {
 			scope.output({message:"Parameter '"+params[i]+"' is required. Parameters expected: "+params.join(", ")+".",data:data},server,true,data.callback?data.callback:false);
 			return false;
 		}
-	}
+	} 
 	
 	return true;
 }
