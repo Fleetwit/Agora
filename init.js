@@ -30,10 +30,14 @@ function main() {
 		scope.log("MongoDB: Connected.");
 		scope.log("Connecting to MySQL...");
 		scope.mysql = mysql.createConnection({
-			host     : 'localhost',
+			/*host     : 'localhost',
 			user     : 'root',
 			password : '',
-			database : 'fleetwit'
+			database : 'fleetwit'*/
+			host     : 'localhost',
+			user     : 'fleetwit_beta',
+			password : '!80803666',
+			database : 'fleetwit_beta'
 		});
 		scope.mysql.connect(function(err) {
 			scope.log("MySQL: Connected.");
