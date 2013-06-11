@@ -182,7 +182,7 @@ main.prototype.updateCount = function(callback) {
 		map: 		mapFn.toString(),
 		reduce: 	reduceFn.toString()
   }, function(err, dbres) {
-  		if (dbres.documents[0].results.length > 0) {
+  		if (dbres.documents[0].results && dbres.documents[0].results.length > 0) {
   			var results = dbres.documents[0].results[0].value;
 			scope.online = results;
   		}
