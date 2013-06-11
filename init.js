@@ -135,6 +135,7 @@ main.prototype.refreshData = function(callback) {
 			for (i in races) {
 				delete races[i].client.races;
 			}
+			console.log("raceData",scope.raceData);
 			scope.raceData = races;
 			callback();
 		});
