@@ -32,14 +32,14 @@ function main() {
 		scope.log("MongoDB: Connected.");
 		scope.log("Connecting to MySQL...");
 		if (scope.options.mysql && scope.options.mysql == "online") {
-			scope.mysql = _mysql.createConnection({
+			scope.mysql = mysql.createConnection({
 				host     : 'localhost',
 				user     : 'fleetwit_beta',
 				password : '!80803666',
 				database : 'fleetwit_beta'
 			});
 		} else {
-			scope.mysql = _mysql.createConnection({
+			scope.mysql = mysql.createConnection({
 				host     : 'localhost',
 				user     : 'root',
 				password : '',
