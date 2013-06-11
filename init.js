@@ -22,6 +22,8 @@ function main() {
 		update:			5000		// Refresh of online count
 	};
 	
+	this.options 	= this.processArgs();
+	
 	scope.log("Connecting to MongoDB...");
 	this.mongo = new datastore({
 		database:		"fleetwit"
@@ -29,16 +31,21 @@ function main() {
 	this.mongo.init(function() {
 		scope.log("MongoDB: Connected.");
 		scope.log("Connecting to MySQL...");
-		scope.mysql = mysql.createConnection({
-			/*host     : 'localhost',
-			user     : 'root',
-			password : '',
-			database : 'fleetwit'*/
-			host     : 'localhost',
-			user     : 'fleetwit_beta',
-			password : '!80803666',
-			database : 'fleetwit_beta'
-		});
+		if (scope.options.mysql && scope.options.mysql == "online") {
+			scope.mysql = _mysql.createConnection({
+				host     : 'localhost',
+				user     : 'fleetwit_beta',
+				password : '!80803666',
+				database : 'fleetwit_beta'
+			});
+		} else {
+			scope.mysql = _mysql.createConnection({
+				host     : 'localhost',
+				user     : 'root',
+				password : '',
+				database : 'fleetwit'
+			});
+		}
 		scope.mysql.connect(function(err) {
 			scope.log("MySQL: Connected.");
 			
@@ -59,6 +66,28 @@ function main() {
 		});
 	});
 }
+main.prototype.processArgs = function() {
+	var i;
+	var args 	= process.argv.slice(2);
+	var output 	= {};
+	for (i=0;i<args.length;i++) {
+		var l1	= args[i].substr(0,1);
+		if (l1 == "-") {
+			if (args[i+1] == "true") {
+				args[i+1] = true;
+			}
+			if (args[i+1] == "false") {
+				args[i+1] = false;
+			}
+			if (!isNaN(args[i+1]*1)) {
+				args[i+1] = args[i+1]*1;
+			}
+			output[args[i].substr(1)] = args[i+1];
+			i++;
+		}
+	}
+	return output;
+};
 main.prototype.refreshData = function(callback) {
 	var i;
 	var j;
