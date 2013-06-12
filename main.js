@@ -2,10 +2,18 @@ var _cluster		= require('cluster');
 var _os				= require('os');
 var _ 				= require('underscore');
 
-var main			= './init.js';
-var options = {
-	timeout:	5000		// if the process doesn't respond after this time, it is killed
+var options = _.extend({
+	timeout:	5000,		// if the process doesn't respond after this time, it is killed,
+	online:		true
+},processArgs());
+
+var main;
+if (options.online) {
+	main			= '/home/gitbuffer/Agora/init.js';
+} else {
+	main			= './init.js';
 }
+
 var i;
 var workers				= {};
 var cpuCount			= 1;//_os.cpus().length;
