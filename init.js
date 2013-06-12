@@ -23,6 +23,7 @@ function main() {
 	};
 	
 	this.options 	= this.processArgs();
+	console.log("Options:\n",this.options);
 	
 	scope.log("Connecting to MongoDB...");
 	this.mongo = new datastore({
@@ -32,6 +33,7 @@ function main() {
 		scope.log("MongoDB: Connected.");
 		scope.log("Connecting to MySQL...");
 		if (scope.options.mysql && scope.options.mysql == "online") {
+			console.log("Switching to online settings...");
 			scope.mysql = mysql.createConnection({
 				host     : 'localhost',
 				user     : 'fleetwit_beta',
@@ -39,6 +41,7 @@ function main() {
 				database : 'fleetwit_beta'
 			});
 		} else {
+			console.log("Switching to offline settings...");
 			scope.mysql = mysql.createConnection({
 				host     : 'localhost',
 				user     : 'root',
@@ -50,8 +53,10 @@ function main() {
 			scope.log("MySQL: Connected.");
 			
 			scope.refreshData(function() {
-				
+				console.log("Data refreshed.");
+				console.log("Updating count...");
 				scope.updateCount(function() {
+					console.log("Count updated.");
 					scope.initServer();
 					// Start the intervals
 					setInterval(function() {
@@ -89,6 +94,7 @@ main.prototype.processArgs = function() {
 	return output;
 };
 main.prototype.refreshData = function(callback) {
+	console.log("Refreshing data...");
 	var i;
 	var j;
 	var l;
@@ -122,6 +128,8 @@ main.prototype.refreshData = function(callback) {
 		}).toArray(function(err, docs) {
 			var clients 		= docs[0].data.clients;
 			var races			= {};
+			
+			console.log("Found "+clients.length+" clients.");
 			
 			var i;
 			var j;
@@ -186,7 +194,7 @@ main.prototype.updateCount = function(callback) {
   			var results = dbres.documents[0].results[0].value;
 			scope.online = results;
   		}
-  		//console.log("ONLINE:: ",JSON.stringify(scope.online));
+  		console.log("ONLINE:: ",JSON.stringify(scope.online));
 		callback();
   })
 	
@@ -194,7 +202,7 @@ main.prototype.updateCount = function(callback) {
 };
 main.prototype.initServer = function() {
 	var scope = this;
-	
+	console.log("Starting HTTP server on port "+this.serverPort+"...");
 	http.createServer(function (req, server) {
 		console.log("****************************************************************");
 		
