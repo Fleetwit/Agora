@@ -25,6 +25,29 @@ for (var i = 0; i < cpuCount; i++) {
     createWorker();
 }
 
+function processArgs() {
+	var i;
+	var args 	= process.argv.slice(2);
+	var output 	= {};
+	for (i=0;i<args.length;i++) {
+		var l1	= args[i].substr(0,1);
+		if (l1 == "-") {
+			if (args[i+1] == "true") {
+				args[i+1] = true;
+			}
+			if (args[i+1] == "false") {
+				args[i+1] = false;
+			}
+			if (!isNaN(args[i+1]*1)) {
+				args[i+1] = args[i+1]*1;
+			}
+			output[args[i].substr(1)] = args[i+1];
+			i++;
+		}
+	}
+	return output;
+};
+
 if (_cluster.isMaster) {
 	if (options.timeout > 0) {
 		setInterval(function() {
