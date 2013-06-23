@@ -8,7 +8,7 @@ var datastore 			= require('./datastore').datastore;
 var url 				= require('url');
 var ObjectID 			= require('mongodb').ObjectID;
 
-var debug_mode			= true;
+var debug_mode			= false;
 
 
 
