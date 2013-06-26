@@ -4,7 +4,8 @@ var _ 				= require('underscore');
 
 var options = _.extend({
 	timeout:	5000,		// if the process doesn't respond after this time, it is killed,
-	online:		true
+	online:		true,
+	threads:	64
 },processArgs());
 
 var main;
@@ -16,7 +17,7 @@ if (options.online) {
 
 var i;
 var workers				= {};
-var cpuCount			= _os.cpus().length;
+var cpuCount			= Math.min(options.threads, _os.cpus().length);
 _cluster.setupMaster({
     exec:	main
 });

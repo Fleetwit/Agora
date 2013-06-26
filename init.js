@@ -100,26 +100,6 @@ main.prototype.refreshData = function(callback) {
 	var l;
 	var scope = this;
 	// get the races data
-	/*scope.mysql.query("select * from races", function(err, rows, fields) {
-		if (rows.length > 0 && rows[0].id > 0) {
-			var l = rows.length;
-			// save the races data
-			for (i=0;i<l;i++) {
-				scope.raceData[rows[i].id] = rows[i];
-			}
-			// Load the number of level per race
-			scope.mysql.query("select count(g.id) as levels, r.id from races as r, races_games_assoc as g where r.id=g.rid group by r.id", function(err, rows, fields) {
-				if (rows.length > 0 && rows[0].id > 0) {
-					l = rows.length;
-					// save the races data
-					for (i=0;i<l;i++) {
-						scope.raceData[rows[i].id].levels	= rows[i].levels;
-					}
-					callback();
-				}
-			});
-		}
-	});*/
 	this.mongo.open("clients", function(collection) {
 		collection.find({
 			
@@ -332,8 +312,40 @@ main.prototype.execute = function(data, server) {
 							levelData.score = 0;
 						}
 						
+						// Check if the level was already submitted
+						if (user.scores && user.scores[data.params.race] && user.scores[data.params.race][levelIndex]) {
+							// user already played this level
+							// We flag the user
+							collection.update(
+								{
+									uid:				user.uid
+								},{
+									$addToSet: {
+										flags: {
+											data:	{
+												data:	levelData,
+												race:	data.params.race,
+												level:	levelIndex,
+											},
+											time:		new Date().getTime(),
+											type:		"race",
+											processed:	false
+										}
+									}
+								},{
+									upsert:true
+								}, function(err, docs) {
+									
+								}
+							);
+							
+							console.log("/!\\ LEVEL SUBMITTED TWICE. USER FLAGGED.");
+							
+							return false;
+						}
 						
-						// Log the score and the data for this game
+						
+						// Log the score and the data for this game (to track the source and data)
 						collection.update(
 							{
 								uid:				user.uid
@@ -343,7 +355,8 @@ main.prototype.execute = function(data, server) {
 										data:	levelData,
 										race:	data.params.race,
 										level:	levelIndex,
-										type:	"data"
+										type:	"data",
+										time:	new Date().getTime()
 									}
 								}
 							},{
@@ -353,7 +366,8 @@ main.prototype.execute = function(data, server) {
 							}
 						);
 						
-						// update general score
+						
+						// update general score (Total score accross all races)
 						collection.update(
 							{
 								uid:			user.uid
@@ -361,6 +375,24 @@ main.prototype.execute = function(data, server) {
 								$inc: {
 									score:	levelData.score
 								}
+							},{
+								upsert:true
+							}, function(err, docs) {
+								
+							}
+						);
+						
+						// update game score (total score just for that race + score for that level)
+						// prepare the increment data
+						var incdata = {};
+						incdata["scores."+data.params.race+".total"] 		= levelData.score;
+						incdata["scores."+data.params.race+"."+levelIndex] 	= levelData.score;
+						
+						collection.update(
+							{
+								uid:			user.uid
+							},{
+								$inc: incdata
 							},{
 								upsert:true
 							}, function(err, docs) {
