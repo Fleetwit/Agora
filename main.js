@@ -1,12 +1,19 @@
 var _cluster		= require('cluster');
 var _os				= require('os');
 var _ 				= require('underscore');
+var monitor 		= require('./lib.monitoring').monitor;
+var mongo 			= require('./mongo').main;
+
+global.monitor 		= new monitor({name:"Agora"});
+global.mongo		= new mongo({database:"stats"});
 
 var options = _.extend({
 	timeout:	5000,		// if the process doesn't respond after this time, it is killed,
 	online:		true,
 	threads:	64
 },processArgs());
+
+console.log("Options",options);
 
 var main;
 if (options.online) {
@@ -16,15 +23,18 @@ if (options.online) {
 }
 
 var i;
-var workers				= {};
-var cpuCount			= Math.min(options.threads, _os.cpus().length);
+var workers			= {};
+options.thread			= Math.min(options.threads, _os.cpus().length);
 _cluster.setupMaster({
     exec:	main
 });
 
-for (var i = 0; i < cpuCount; i++) {
-    createWorker();
-}
+
+global.mongo.init(function() {
+	for (var i = 0; i < options.thread; i++) {
+	    createWorker();
+	}
+});
 
 function processArgs() {
 	var i;
@@ -65,6 +75,9 @@ if (_cluster.isMaster) {
 	}
 }
 
+
+var processHistory 	= {};
+var processTime 	= {};
 function createWorker() {
 	var worker 	= _cluster.fork();
 	console.log("New worker: ",worker.process.pid);
@@ -73,11 +86,18 @@ function createWorker() {
 		lastCheck:	new Date().getTime()-1000	// allow boot time
 	};
 	worker.on('message', function(data) {
+		// register the time
+		
+		var curTime = new Date().getTime();
+		if (processHistory[worker.process.pid]) {
+			processTime[worker.process.pid] = curTime-processHistory[worker.process.pid];
+			global.monitor.process(processTime);
+		}
+		processHistory[worker.process.pid] = curTime;
 		if (workers[worker.process.pid] && workers[worker.process.pid].lastCheck) {
-			workers[worker.process.pid].lastCheck = new Date().getTime();
+			workers[worker.process.pid].lastCheck = curTime;
 		}
 		
 	});
 	
 };
-

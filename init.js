@@ -7,10 +7,13 @@ var _ 					= require('underscore');
 var datastore 			= require('./datastore').datastore;
 var url 				= require('url');
 var ObjectID 			= require('mongodb').ObjectID;
+var monitor 			= require('./lib.monitoring').monitor;
+var mongo 				= require('./mongo').main;
 
-var debug_mode			= false;
+var debug_mode			= true;
 
-
+global.monitor 		= new monitor({name:"Agora"});
+global.mongo		= new mongo({database:"stats"});
 
 function main() {
 	var scope 		= this;
@@ -25,13 +28,15 @@ function main() {
 	this.options 	= this.processArgs();
 	console.log("Options:\n",this.options);
 	
-	scope.log("Connecting to MongoDB...");
+	global.monitor.set("Agora.settings", this.options);
+	
+	console.log("Connecting to MongoDB...");
 	this.mongo = new datastore({
 		database:		"fleetwit"
 	});
 	this.mongo.init(function() {
-		scope.log("MongoDB: Connected.");
-		scope.log("Connecting to MySQL...");
+		console.log("MongoDB: Connected.");
+		console.log("Connecting to MySQL...");
 		if (scope.options.mysql && scope.options.mysql == "online") {
 			console.log("Switching to online settings...");
 			scope.mysql = mysql.createConnection({
@@ -50,13 +55,10 @@ function main() {
 			});
 		}
 		scope.mysql.connect(function(err) {
-			scope.log("MySQL: Connected.");
+			console.log("MySQL: Connected.");
 			
 			scope.refreshData(function() {
-				console.log("Data refreshed.");
-				console.log("Updating count...");
 				scope.updateCount(function() {
-					console.log("Count updated.");
 					scope.initServer();
 					// Start the intervals
 					setInterval(function() {
@@ -93,8 +95,9 @@ main.prototype.processArgs = function() {
 	}
 	return output;
 };
+
+// Get the list of clients and races
 main.prototype.refreshData = function(callback) {
-	console.log("Refreshing data...");
 	var i;
 	var j;
 	var l;
@@ -108,8 +111,6 @@ main.prototype.refreshData = function(callback) {
 		}).toArray(function(err, docs) {
 			var clients 		= docs[0].data.clients;
 			var races			= {};
-			
-			console.log("Found "+clients.length+" clients.");
 			
 			var i;
 			var j;
@@ -128,7 +129,27 @@ main.prototype.refreshData = function(callback) {
 		});
 	});
 };
+
+// get the number of users online
 main.prototype.updateCount = function(callback) {
+	var scope = this;
+	
+	this.mongo.open("online", function(collection) {
+		collection.find({
+			type: 'level'
+		}).toArray(function(err, docs) {
+			
+			if (docs.length == 0) {
+				scope.online = {};
+			} else {
+				scope.online = docs[0].data;
+			}
+			callback();
+		});
+	});
+	
+};
+/*main.prototype.updateCount = function(callback) {
 	var i;
 	var j;
 	var l;
@@ -174,12 +195,12 @@ main.prototype.updateCount = function(callback) {
   			var results = dbres.documents[0].results[0].value;
 			scope.online = results;
   		}
-  		console.log("ONLINE:: ",JSON.stringify(scope.online));
+  		//console.log("ONLINE:: ",JSON.stringify(scope.online));
 		callback();
   })
 	
 	
-};
+};*/
 main.prototype.initServer = function() {
 	var scope = this;
 	console.log("Starting HTTP server on port "+this.serverPort+"...");
@@ -193,13 +214,10 @@ main.prototype.initServer = function() {
 			});
 			req.on('end',function(){
 				var POST =  qs.parse(body);
-				scope.log("POST RAW:",POST);
 				scope.parseRequest(POST, server);
 			});
 		} else {
-			scope.log("URL:",req.url);
 			url_parts = url.parse(req.url, true);
-			scope.log("url_parts:",url_parts);
 			scope.parseRequest(url_parts.query, server);
 			//scope.output({message:"HTTP POST requests only."},server,true);
 		}
@@ -219,9 +237,6 @@ main.prototype.parseRequest = function(data, server) {
 		data.params = JSON.parse(data.params);
 	}
 	
-	
-	scope.log("POST PARSED:",data);
-	
 	// Make sure we have all the data
 	if (!this.validateParameters(data, server)) {
 		return false;
@@ -232,7 +247,7 @@ main.prototype.parseRequest = function(data, server) {
 main.prototype.execute = function(data, server) {
 	var scope = this;
 	
-	scope.log("execute: ", data);
+	console.log("exec: ",data.method);
 	
 	switch (data.method) {
 		default:
@@ -244,6 +259,10 @@ main.prototype.execute = function(data, server) {
 				var timer = new Date(scope.raceData[data.params.race].start_time*1000).getTime()-new Date().getTime();
 				scope.output({timer:timer},server,false,data.callback?data.callback:false);
 			}
+			
+			// Log the connection
+			global.monitor.push("Agora.register", 1, {race:data.params.race});
+			
 			// register the user to level 0
 			// get the userdata
 			this.mongo.open("datastore", function(collection) {
@@ -275,21 +294,38 @@ main.prototype.execute = function(data, server) {
 							
 						}
 					);
-					
 				});
 			});
 		break;
 		case "level":
 			if (scope.requireParameters(data, server, ["race","level"])) {
-				//@TODO
-				if (!scope.online[data.params.race]) {
-					scope.online[data.params.race] = {};
-				}
-				if (!scope.online[data.params.race][data.params.level-1]) {
-					scope.online[data.params.race][data.params.level-1] = 0;
-				}
-				var online = scope.online[data.params.race][data.params.level-1];
+				
+				var online = scope.getOnlineCount(data.params.race, data.params.level);
+				
+				global.monitor.push("Agora.online", 1, {race:data.params.race,level:data.params.level});
+				
+				// register the number of users online
+				this.mongo.open("online", function(collection) {
+					var updateObj = {
+						'$inc':	 {}
+					};
+					
+					updateObj['$inc']["data."+data.params.race+'.'+data.params.level+''] = 1;
+					
+					collection.update(
+						{
+							type: 'level'
+						},updateObj,{
+							upsert:true
+						}, function(err, docs) {
+							
+						}
+					);
+				});
+				
 				scope.output({online:online},server,false,data.callback?data.callback:false);
+			} else {
+				console.log("error :(");
 			}
 		break;
 		case "score":
@@ -338,6 +374,8 @@ main.prototype.execute = function(data, server) {
 									
 								}
 							);
+							
+							global.monitor.push("Agora.duplicate", 1, {race:data.params.race,level:levelIndex+1});
 							
 							console.log("/!\\ LEVEL SUBMITTED TWICE. USER FLAGGED.");
 							
@@ -399,7 +437,9 @@ main.prototype.execute = function(data, server) {
 								
 							}
 						);
-							
+						
+						// log the average score
+						global.monitor.push("Agora.score", levelData.score, {race:data.params.race,level:levelIndex+1});
 					});
 				});
 				
@@ -408,6 +448,16 @@ main.prototype.execute = function(data, server) {
 			}
 		break;
 	}
+}
+main.prototype.getOnlineCount = function(race, level) {
+	if (!this.online[race]) {
+		return 0;
+	}
+	if (!this.online[race][level]) {
+		return 0;
+	}
+	return this.online[race][level];
+	
 }
 main.prototype.sendScore = function(server) {
 	var scope = this;
@@ -429,8 +479,6 @@ main.prototype.validateParameters = function(data, server, required) {
 			return false;
 		}
 	}
-	
-	scope.info("typeof",typeof(data.params));
 	
 	if (typeof(data.params) == "string") {
 		data.params = JSON.parse(data.params);
@@ -472,7 +520,7 @@ main.prototype.output = function(data, server, error, jsonpCallback) {
 		server.write(JSON.stringify(output));
 	}
 	
-	scope.log("OUTPUT",output);
+	console.log("OUTPUT",output);
 	server.end();
 	
 	return true;
@@ -483,7 +531,7 @@ main.prototype.log = function(){
 	blue  	= '\u001b[34m';
 	green  	= '\u001b[32m';
 	reset 	= '\u001b[0m';
-	console.log(green+"<DATASTORE>");
+	console.log(green+"<AGORA>");
 	for (i in arguments) {
 		console.log(reset, arguments[i],reset);
 	}
@@ -494,14 +542,15 @@ main.prototype.info = function(){
 	blue  	= '\u001b[34m';
 	green  	= '\u001b[32m';
 	reset 	= '\u001b[0m';
-	console.log(green+"<DATASTORE>");
+	console.log(green+"<AGORA>");
 	for (i in arguments) {
-		console.log(blue, arguments[i],reset);
+		console.log(red, arguments[i],reset);
 	}
 };
 
-new main();
-
+global.mongo.init(function() {
+	new main();
+});
 
 
 function QS(req) {
@@ -539,8 +588,6 @@ setInterval(function() {
 // Crash Management
 if (!debug_mode) {
 	process.on('uncaughtException', function(err) {
-		console.log("uncaughtException",err);
+		global.monitor.log("Agora.error", err.stack);
 	});
 }
-
-
