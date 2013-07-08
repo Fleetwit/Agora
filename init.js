@@ -10,7 +10,7 @@ var ObjectID 			= require('mongodb').ObjectID;
 var monitor 			= require('./lib.monitoring').monitor;
 var mongo 				= require('./mongo').main;
 
-var debug_mode			= true;
+var debug_mode			= false;
 
 global.monitor 		= new monitor({name:"Agora"});
 global.mongo		= new mongo({database:"stats"});
