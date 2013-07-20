@@ -12,8 +12,8 @@ var mongo 				= require('./mongo').main;
 
 var debug_mode			= false;
 
-global.monitor 		= new monitor({name:"Agora"});
-global.mongo		= new mongo({database:"stats"});
+global.monitor 			= new monitor({name:"Agora"});
+global.mongo			= new mongo({database:"stats"});
 
 function main() {
 	var scope 		= this;
@@ -149,58 +149,7 @@ main.prototype.updateCount = function(callback) {
 	});
 	
 };
-/*main.prototype.updateCount = function(callback) {
-	var i;
-	var j;
-	var l;
-	var scope = this;
-	
-	var mapFn = function(){
-		emit(
-			"output",
-			this.racedata
-		);
-	}
-	var reduceFn = function(key, values) {
-		
-		var output = {};
-		var i;
-		var j;
-		var l = values.length;
-		var l2;
-		for (i=0;i<l;i++) {
-			if (values[i]) {
-				l2 = values[i].length;
-				for (j=0;j<l2;j++) {
-					if (!output[values[i][j].race]) {
-						output[values[i][j].race] = {};
-					}
-					if (!output[values[i][j].race][values[i][j].level]) {
-						output[values[i][j].race][values[i][j].level] = 0;
-					}
-					output[values[i][j].race][values[i][j].level]++;
-				}
-			}
-		}
-		return output;
-	};
-	
-	this.mongo.db.executeDbCommand({
-		mapreduce: 	"datastore", 
-		out:  		{ inline : 1 },
-		map: 		mapFn.toString(),
-		reduce: 	reduceFn.toString()
-  }, function(err, dbres) {
-  		if (dbres.documents[0].results && dbres.documents[0].results.length > 0) {
-  			var results = dbres.documents[0].results[0].value;
-			scope.online = results;
-  		}
-  		//console.log("ONLINE:: ",JSON.stringify(scope.online));
-		callback();
-  })
-	
-	
-};*/
+
 main.prototype.initServer = function() {
 	var scope = this;
 	console.log("Starting HTTP server on port "+this.serverPort+"...");
@@ -297,6 +246,13 @@ main.prototype.execute = function(data, server) {
 				});
 			});
 		break;
+		case "comeback":
+			if (scope.requireParameters(data, server, ["race"])) {
+				// Tell the user when the race is starting
+				var timer = new Date(scope.raceData[data.params.race].start_time*1000).getTime()-new Date().getTime();
+				scope.output({timer:timer},server,false,data.callback?data.callback:false);
+			}
+		break;
 		case "level":
 			if (scope.requireParameters(data, server, ["race","level"])) {
 				
@@ -330,7 +286,7 @@ main.prototype.execute = function(data, server) {
 		break;
 		case "score":
 			if (scope.requireParameters(data, server, ["race","level","data"])) {
-				
+				console.log("\ndata:\n",JSON.stringify(data,null, "\t"));
 				// get the userdata
 				this.mongo.open("datastore", function(collection) {
 					collection.find({
@@ -437,6 +393,48 @@ main.prototype.execute = function(data, server) {
 								
 							}
 						);
+						
+						// log the average score
+						global.monitor.push("Agora.score", levelData.score, {race:data.params.race,level:levelIndex+1});
+					});
+				});
+				
+				
+				scope.output({sent:true},server,false,data.callback?data.callback:false);
+			}
+		break;
+		case "finalize":
+			if (scope.requireParameters(data, server, ["race","multiplier"])) {
+				console.log("\ndata:\n",JSON.stringify(data,null, "\t"));
+				// get the userdata
+				this.mongo.open("datastore", function(collection) {
+					collection.find({
+						_id:	new ObjectID(data.id)
+					}, {
+						limit:1
+					}).toArray(function(err, docs) {
+						
+						var scope 			= this;
+						var user 			= docs[0];
+						if (user.scores && user.scores[data.params.race] && user.scores[data.params.race].total && !user.scores[data.params.race].multiplier) {
+							var setdata = {};
+							setdata["scores."+data.params.race+".multiplier"] 	= data.params.multiplier;
+							setdata["scores."+data.params.race+".total"] 		= user.scores[data.params.race].total*data.params.multiplier;
+							// update game multiplier
+							
+							collection.update(
+								{
+									uid:			user.uid
+								},{
+									$set: setdata
+								},{
+									upsert:true
+								}, function(err, docs) {
+									
+								}
+							);
+						}
+						
 						
 						// log the average score
 						global.monitor.push("Agora.score", levelData.score, {race:data.params.race,level:levelIndex+1});
