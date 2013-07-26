@@ -284,6 +284,30 @@ main.prototype.execute = function(data, server) {
 				console.log("error :(");
 			}
 		break;
+		case "start":
+			if (scope.requireParameters(data, server, ["race"])) {
+				this.mongo.open("datastore", function(collection) {
+					
+					var setdata = {};
+					setdata["scores."+data.params.race+".start"] = new Date().getTime()-new Date(scope.raceData[data.params.race].start_time*1000).getTime();
+					
+					collection.update(
+						{
+							_id:	new ObjectID(data.id)
+						},{
+							$set: setdata
+						},{
+							upsert:true
+						}, function(err, docs) {
+							scope.output({set:setdata["scores."+data.params.race+".start"]},server,false,data.callback?data.callback:false);
+						}
+					);
+				});
+				
+			} else {
+				console.log("error :(");
+			}
+		break;
 		case "score":
 			if (scope.requireParameters(data, server, ["race","level","data"])) {
 				console.log("\ndata:\n",JSON.stringify(data,null, "\t"));
