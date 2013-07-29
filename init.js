@@ -419,7 +419,7 @@ main.prototype.execute = function(data, server) {
 						);
 						
 						// log the average score
-						global.monitor.push("Agora.score", levelData.score, {race:data.params.race,level:levelIndex+1});
+						//global.monitor.push("Agora.score", levelData.score, {race:data.params.race,level:levelIndex+1});
 					});
 				});
 				
@@ -461,7 +461,7 @@ main.prototype.execute = function(data, server) {
 						
 						
 						// log the average score
-						global.monitor.push("Agora.score", levelData.score, {race:data.params.race,level:levelIndex+1});
+						//global.monitor.push("Agora.score", levelData.score, {race:data.params.race,level:levelIndex+1});
 					});
 				});
 				
