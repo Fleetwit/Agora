@@ -40,10 +40,10 @@ function main() {
 		if (scope.options.mysql && scope.options.mysql == "online") {
 			console.log("Switching to online settings...");
 			scope.mysql = mysql.createConnection({
-				host     : 'localhost',
-				user     : 'fleetwit_beta',
-				password : '!80803666',
-				database : 'fleetwit_beta'
+				host     : '',
+				user     : '',
+				password : '',
+				database : ''
 			});
 		} else {
 			console.log("Switching to offline settings...");
@@ -206,6 +206,7 @@ main.prototype.execute = function(data, server) {
 			if (scope.requireParameters(data, server, ["race"])) {
 				// Tell the user when the race is starting
 				var timer = new Date(scope.raceData[data.params.race].start_time*1000).getTime()-new Date().getTime();
+				console.log("timer:",timer);
 				scope.output({timer:timer},server,false,data.callback?data.callback:false);
 			}
 			
